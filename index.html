@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>INBOX — Tellonym → Instagram</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>▲</text></svg>">
+</head>
+<body>
+
+  <!-- ── AMBIENT LAYERS ── -->
+  <div class="ambient-cursor" id="ambient-cursor"></div>
+  <div class="grid-overlay"></div>
+  <div class="particles" id="particles"></div>
+
+  <!-- ── TOAST ── -->
+  <div class="toast toast-info" id="toast" style="display:none"></div>
+
+  <!-- ── PREVIEW MODAL ── -->
+  <div class="preview-overlay" id="preview-overlay" style="display:none" onclick="hidePreview()">
+    <div style="text-align:center">
+      <img id="preview-img" class="preview-img" src="" alt="Screenshot Preview">
+      <p style="margin-top:20px;font-size:11px;font-family:var(--mono);color:rgba(255,255,255,0.3)">
+        screenshot auto-posted to instagram · tap to close
+      </p>
+    </div>
+  </div>
+
+  <!-- ── SETUP MODAL ── -->
+  <div class="modal-overlay" id="setup-modal" style="display:none" onclick="hideSetup()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 style="font-size:22px;font-weight:700;letter-spacing:-0.03em">How to Get Your Keys</h2>
+        <button class="modal-close" onclick="hideSetup()">✕</button>
+      </div>
+
+      <div class="setup-section" style="animation:fadeSlideIn .4s ease both">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <span class="setup-num" style="color:#34d399;background:rgba(52,211,153,0.1)">01</span>
+          <span style="font-size:15px;font-weight:600">Supabase URL & Anon Key</span>
+        </div>
+        <div class="setup-step">1. Go to supabase.com → sign up or log in</div>
+        <div class="setup-step">2. Click "New Project" → name it anything</div>
+        <div class="setup-step">3. Once created, go to Settings → API (or click Connect)</div>
+        <div class="setup-step">4. Copy "Project URL" → paste as SUPABASE_URL in secrets.js</div>
+        <div class="setup-step">5. Copy "anon / publishable" key → paste as SUPABASE_KEY</div>
+        <div class="setup-step">6. Run this SQL in Supabase SQL Editor:</div>
+        <pre class="setup-code">create table messages (
+  id bigint generated always as identity primary key,
+  text text not null,
+  sender text default 'anonymous',
+  category text,
+  status text default 'pending',
+  screenshot_url text,
+  created_at timestamptz default now()
+);
+
+alter table messages enable row level security;
+create policy "public_access" on messages for all using (true);
+
+-- Storage bucket for screenshots
+insert into storage.buckets (id, name, public)
+values ('screenshots', 'screenshots', true);
+
+-- Allow public uploads to screenshots bucket
+create policy "public_upload" on storage.objects
+  for all using (bucket_id = 'screenshots');</pre>
+      </div>
+
+      <div class="setup-section" style="animation:fadeSlideIn .4s ease .06s both">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <span class="setup-num" style="color:#a78bfa;background:rgba(167,139,250,0.1)">02</span>
+          <span style="font-size:15px;font-weight:600">Gemini API Key (free)</span>
+        </div>
+        <div class="setup-step">1. Go to aistudio.google.com</div>
+        <div class="setup-step">2. Sign in with any Google account</div>
+        <div class="setup-step">3. Click "Get API key" in the left sidebar</div>
+        <div class="setup-step">4. Click "Create API key" → pick new project</div>
+        <div class="setup-step">5. Copy the key → paste as GEMINI_API_KEY in secrets.js</div>
+        <div class="setup-step" style="color:rgba(167,139,250,0.5)">Free tier: 60 req/min — more than enough</div>
+      </div>
+
+      <div class="setup-section" style="animation:fadeSlideIn .4s ease .12s both">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <span class="setup-num" style="color:#f472b6;background:rgba(244,114,182,0.1)">03</span>
+          <span style="font-size:15px;font-weight:600">Instagram Access Token & User ID</span>
+        </div>
+        <div class="setup-step">1. Switch your IG account to Business or Creator</div>
+        <div class="setup-step">2. Go to developers.facebook.com → Create App</div>
+        <div class="setup-step">3. Choose "Other" → "Business" type → create</div>
+        <div class="setup-step">4. Add the "Instagram Graph API" product</div>
+        <div class="setup-step">5. Open Tools → Graph API Explorer</div>
+        <div class="setup-step">6. Select your app and add these permissions:</div>
+        <div class="setup-step" style="padding-left:16px;color:#f472b6">instagram_basic</div>
+        <div class="setup-step" style="padding-left:16px;color:#f472b6">instagram_content_publish</div>
+        <div class="setup-step" style="padding-left:16px;color:#f472b6">pages_show_list</div>
+        <div class="setup-step">7. Click "Generate Access Token" → authorize</div>
+        <div class="setup-step">8. Copy token → paste as IG_ACCESS_TOKEN in secrets.js</div>
+        <div class="setup-step">9. Run GET /me?fields=id → copy the ID → paste as IG_USER_ID</div>
+        <div class="setup-step">10. Extend token: Access Token Debugger → "Extend Access Token"</div>
+        <div class="setup-step" style="color:rgba(244,114,182,0.4)">Token lasts 60 days — refresh before it expires</div>
+      </div>
+
+      <div class="setup-section" style="animation:fadeSlideIn .4s ease .18s both">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <span class="setup-num" style="color:#60a5fa;background:rgba(96,165,250,0.1)">04</span>
+          <span style="font-size:15px;font-weight:600">Tellonym Inbox Feed</span>
+        </div>
+        <div class="setup-step">1. Tellonym has no public API</div>
+        <div class="setup-step">2. Option A: Build a Node.js scraper on Replit</div>
+        <div class="setup-step">3. Option B: Manually paste messages into Supabase</div>
+        <div class="setup-step">4. Scraper should INSERT rows into 'messages' table</div>
+        <div class="setup-step">5. Set on a cron interval (every 5 min)</div>
+      </div>
+
+      <div class="setup-section" style="animation:fadeSlideIn .4s ease .24s both">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <span class="setup-num" style="color:#fbbf24;background:rgba(251,191,36,0.1)">05</span>
+          <span style="font-size:15px;font-weight:600">Deploy</span>
+        </div>
+        <div class="setup-step">1. Upload this entire folder to Replit (or Vercel/Netlify)</div>
+        <div class="setup-step">2. Edit secrets.js with your real keys</div>
+        <div class="setup-step">3. That's it — open index.html and you're live</div>
+        <div class="setup-step" style="color:rgba(251,191,36,0.4)">For Replit: just drag & drop the folder</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ HEADER ━━━ -->
+  <header class="header">
+    <div style="display:flex;align-items:center">
+      <div class="logo-mark">▲</div>
+      <div class="logo-text">
+        <h1>INBOX</h1>
+        <span>TELLONYM → GEMINI → INSTAGRAM</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-btn active" data-view="inbox" onclick="setView('inbox')">
+        Inbox <span class="nav-badge" id="nav-inbox-count">0</span>
+      </button>
+      <button class="nav-btn" data-view="history" onclick="setView('history')">
+        History <span class="nav-badge" id="nav-history-count">0</span>
+      </button>
+      <button class="nav-btn" data-view="analytics" onclick="setView('analytics')">
+        Analytics
+      </button>
+    </nav>
+
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="setup-btn" onclick="showSetup()">? setup</button>
+      <div class="status-dot">
+        <div class="status-dot-inner" id="status-dot-inner"></div>
+        <div class="status-dot-ring" id="status-dot-ring"></div>
+      </div>
+      <span style="font-size:10px;font-family:var(--mono);color:rgba(255,255,255,0.25)" id="status-text">demo</span>
+    </div>
+  </header>
+
+  <!-- ━━━ CONTENT ━━━ -->
+  <div class="content">
+
+    <!-- ── INBOX PANEL ── -->
+    <div id="panel-inbox">
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card" style="animation:fadeSlideIn .5s ease both">
+          <div class="glow" style="background:radial-gradient(circle at 50% 50%,rgba(120,90,255,0.08),transparent 60%)"></div>
+          <div class="stat-label"><span>PENDING</span><span style="font-size:16px;color:rgba(120,90,255,0.25)">◎</span></div>
+          <div class="stat-value" id="stat-pending" style="color:#785aff">0</div>
+        </div>
+        <div class="stat-card" style="animation:fadeSlideIn .5s ease .08s both">
+          <div class="glow" style="background:radial-gradient(circle at 50% 50%,rgba(52,211,153,0.08),transparent 60%)"></div>
+          <div class="stat-label"><span>ACCEPTED</span><span style="font-size:16px;color:rgba(52,211,153,0.25)">✓</span></div>
+          <div class="stat-value" id="stat-accepted" style="color:#34d399">0</div>
+        </div>
+        <div class="stat-card" style="animation:fadeSlideIn .5s ease .16s both">
+          <div class="glow" style="background:radial-gradient(circle at 50% 50%,rgba(239,68,68,0.08),transparent 60%)"></div>
+          <div class="stat-label"><span>REJECTED</span><span style="font-size:16px;color:rgba(239,68,68,0.25)">✕</span></div>
+          <div class="stat-value" id="stat-rejected" style="color:#ef4444">0</div>
+        </div>
+        <div class="stat-card" style="animation:fadeSlideIn .5s ease .24s both">
+          <div class="glow" style="background:radial-gradient(circle at 50% 50%,rgba(244,114,182,0.08),transparent 60%)"></div>
+          <div class="stat-label"><span>POSTED</span><span style="font-size:16px;color:rgba(244,114,182,0.25)">◈</span></div>
+          <div class="stat-value" id="stat-posted" style="color:#f472b6">0</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="action-bar">
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn-categorize" id="btn-categorize" onclick="categorizeAll()">◈ gemini categorize</button>
+          <button class="btn-reset" onclick="resetDemo()">↺ reset</button>
+          <button class="auto-post-badge" id="auto-post-toggle" onclick="toggleAutoPost()" style="cursor:pointer">
+            <span class="dot"></span> auto-post ON
+          </button>
+        </div>
+        <div class="filter-bar">
+          <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
+          <button class="filter-btn" data-filter="compliment" onclick="setFilter('compliment')">✦ Compliment</button>
+          <button class="filter-btn" data-filter="question" onclick="setFilter('question')">? Question</button>
+          <button class="filter-btn" data-filter="confession" onclick="setFilter('confession')">♡ Confession</button>
+          <button class="filter-btn" data-filter="feedback" onclick="setFilter('feedback')">◈ Feedback</button>
+          <button class="filter-btn" data-filter="toxic" onclick="setFilter('toxic')">⚠ Toxic</button>
+          <button class="filter-btn" data-filter="other" onclick="setFilter('other')">◯ Other</button>
+        </div>
+      </div>
+
+      <!-- Message List -->
+      <div class="msg-list" id="msg-list"></div>
+    </div>
+
+    <!-- ── HISTORY PANEL ── -->
+    <div id="panel-history" style="display:none">
+      <h2 style="font-size:20px;font-weight:700;margin-bottom:20px;letter-spacing:-0.03em">
+        Processed <span style="color:rgba(255,255,255,0.25);font-weight:300">(<span id="history-count">0</span>)</span>
+      </h2>
+      <div style="display:flex;flex-direction:column;gap:6px" id="history-list"></div>
+    </div>
+
+    <!-- ── ANALYTICS PANEL ── -->
+    <div id="panel-analytics" style="display:none">
+      <h2 style="font-size:20px;font-weight:700;margin-bottom:24px;letter-spacing:-0.03em">Analytics</h2>
+
+      <div class="stat-card" style="padding:28px;border-radius:20px;margin-bottom:16px;animation:fadeSlideIn .4s ease both">
+        <div class="glow" style="background:radial-gradient(circle at 50% 50%,rgba(120,90,255,0.06),transparent 60%)"></div>
+        <div style="font-size:12px;font-family:var(--mono);color:rgba(255,255,255,0.3);margin-bottom:20px;text-transform:uppercase;letter-spacing:0.1em">Category Breakdown</div>
+        <div class="chart-bar-wrap" id="chart-bars"></div>
+      </div>
+
+      <div class="stat-card" style="padding:28px;border-radius:20px;animation:fadeSlideIn .4s ease .1s both">
+        <div class="glow" style="background:radial-gradient(circle at 50% 50%,rgba(52,211,153,0.06),transparent 60%)"></div>
+        <div style="font-size:12px;font-family:var(--mono);color:rgba(255,255,255,0.3);margin-bottom:20px;text-transform:uppercase;letter-spacing:0.1em">Pipeline</div>
+        <div class="pipeline" id="pipeline"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">TELLONYM × GEMINI × INSTAGRAM — PRIVATE DASHBOARD</div>
+
+  <!-- ── SCRIPTS (order matters: secrets first) ── -->
+  <script src="secrets.js"></script>
+  <script src="scripts/app.js"></script>
+</body>
+</html>
